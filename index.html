@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8">
+  <title>BakelseBeställningar</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f7f2ee;
+      margin: 0;
+      padding: 20px;
+    }
+
+    h1, h2 {
+      text-align: center;
+    }
+
+    .container {
+      max-width: 500px;
+      margin: auto;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+
+    label {
+      display: block;
+      margin-top: 12px;
+      font-weight: bold;
+    }
+
+    input, textarea, select {
+      width: 100%;
+      padding: 8px;
+      margin-top: 5px;
+    }
+
+    button {
+      margin-top: 15px;
+      width: 100%;
+      padding: 10px;
+      background: #c97c5d;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #b56b4f;
+    }
+
+    .order {
+      background: #fff3ea;
+      padding: 10px;
+      border-radius: 5px;
+      margin-bottom: 10px;
+    }
+
+    .order.done {
+      opacity: 0.6;
+      text-decoration: line-through;
+    }
+
+    .order-time {
+      font-size: 12px;
+      color: #555
+    }
+
+    .order button {
+      width: auto;
+      margin-right: 5px;
+      margin-top: 5px;
+      font-size: 12px;
+    }
+
+    .done-btn { background: #4caf50; }
+    .delete-btn { background: #e53935}
+
+    #sellerPanel {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+<h1>🍰 Beställ bakelser</h1>
+
+<div class="container">
+  <label>Namn</label>
+  <input id="name">
+
+  <label>Bakelse</label>
+  <select id="pastry">
+    <option>Chokladbakelse</option>
+    <option>Vaniljbakelse</option>
+    <option>Hallonbakelse</option>
+    <option>Kanelbulle</option>
+  </select>
+
+  <label>Antal</label>
+  <input type="number" id="amount" min="1" value="1">
+
+  <label>Kommentar</label>
+  <textarea id="comment"></textarea>
+
+  <button type="button" onclick="addOrder()">Skicka beställning</button>
+</div>
+
+<div class="container" id="loginBox" style="margin-top: 30px;">
+  <h2>Säljarinloggning</h2>
+
+  <label>Användarnamn</label>
+  <input type="text" id="username">
+
+  <label>Lösenord</label>
+  <input type="password" id="password">
+
+  <button onclick="loginSeller()">Logga in</button>
+</div>
+
+<div class="container" id="sellerPanel">
+  <h2>Säljarpanel</h2>
+
+  <button onclick="logoutSeller()" style="background: #777;">
+    Logga ut
+  </button>
+
+  <div id="orders" style="margin-top: 20px;"></div>
+</div>
+
+<script>
+  const SELLER_USER = "NeoMaster";
+  const SELLER_PASS = "Kaka123";
+  let sellerLoggedIn = false;
+  let orders = JSON.parse(localStorage.getItem("orders")) || [];
+  
+  function addOrder() {
+    const name = document.getElementById("name").value;
+    if (!name) return alert("Fyll i namn");
+
+    const now = new Date();
+
+    orders.push({
+      id: Date.now(),
+      name,
+      pastry: pastry.value,
+      amount: amount.value,
+      comment: comment.value,
+      date: now.toLocaleDateString("sv-SE"),
+      time: now.toLocaleTimeString("sv-SE", { hour:"2-digit", minute:"2-digit" }),
+      done: false
+    });
+
+    saveOrders();
+    document.getElementById("name").value = "";
+    document.getElementById("comment").value = "";
+  }
+
+  function loginSeller() {
+    if (username.value === SELLER_USER && password.value === SELLER_PASS) {
+      sellerLoggedIn = true;
+
+      loginBox.style.display = "none";
+      sellerPanel.style.display = "block";
+
+      renderOrders();
+    } else {
+      alert("Fel inloggning");
+    }
+  }
+
+  function logoutSeller() {
+    sellerLoggedIn = false;
+    sellerPanel.style.display = "none";
+    loginBox.style.display = "block";
+  }
+
+  function saveOrders() {
+  localStorage.setItem("orders", JSON.stringify(orders));
+  }
+
+  function renderOrders() {
+    const container = document.getElementById("orders");
+    container.innerHTML = "";
+
+    orders.forEach(order => {
+      const div = document.createElement("div");
+      div.className = "order" + (order.done ? " done" : "");
+      div.dataset.id = order.id;
+
+      div.innerHTML = `
+        <strong>${order.name}</strong><br>
+        ${order.amount} st ${order.pastry}<br>
+        ${order.comment}
+        <div class="order-time">📅 ${order.date} – ${order.time}</div>
+
+        <button type="button" class="done-btn">✅ Klar</button>
+        <button type="button" class="delete-btn">Ta bort</button>
+      `;
+
+      container.appendChild(div);
+    });
+  }
+
+  document.getElementById("orders").addEventListener("click", function (e) {
+    if (!sellerLoggedIn) {
+      alert("Endast säljare kan ändra beställningar");
+      return;
+    }
+
+    const orderDiv = e.target.closest(".order");
+    if (!orderDiv) return;
+
+    const id = Number(orderDiv.dataset.id);
+
+    if (e.target.classList.contains("delete-btn")) {
+      orders = orders.filter(o => o.id !== id);
+      saveOrders();
+      renderOrders();
+    }
+
+    if (e.target.classList.contains("done-btn")) {
+      const order = orders.find(o => o.id === id);
+      order.done = !order.done;
+      saveOrders();
+      renderOrders();
+    }
+  });
+
+</script>
+
+</body>
+</html>
