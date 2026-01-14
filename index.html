@@ -138,26 +138,22 @@
   let sellerLoggedIn = false;
   let orders = JSON.parse(localStorage.getItem("orders")) || [];
   
-  function addOrder() {
-    const name = document.getElementById("name").value;
-    if (!name) return alert("Fyll i namn");
-
+  async function addOrder() {
     const now = new Date();
 
-    orders.push({
-      id: Date.now(),
-      name,
-      pastry: pastry.value,
-      amount: amount.value,
-      comment: comment.value,
-      date: now.toLocaleDateString("sv-SE"),
-      time: now.toLocaleTimeString("sv-SE", { hour:"2-digit", minute:"2-digit" }),
-      done: false
+    await addDoc(collection(db, "orders"), {
+      name: document.getElementById("name").value,
+      pastry: document.getElementById("pastry").value,
+      amount: document.getElementById("amount").value,
+      comment: document.getElementById("comment").value,
+      done: false,
+      createdAt: now
     });
 
-    saveOrders();
     document.getElementById("name").value = "";
     document.getElementById("comment").value = "";
+
+    alert("Beställning skickad!");
   }
 
   function loginSeller() {
@@ -183,30 +179,38 @@
   localStorage.setItem("orders", JSON.stringify(orders));
   }
 
-  function renderOrders() {
+  async function renderOrders() {
     const container = document.getElementById("orders");
     container.innerHTML = "";
 
-    orders.forEach(order => {
+    const snapshot = await getDocs(collection(db, "orders"));
+
+    snapshot.forEach(docSnap => {
+      const o = docSnap.data();
+
       const div = document.createElement("div");
-      div.className = "order" + (order.done ? " done" : "");
-      div.dataset.id = order.id;
+      div.className = "order" + (o.done ? " done" : "");
+      div.dataset.id = docSnap.id;
+
+      const date = o.createdAt?.toDate
+        ? o.createdAt.toDate().toLocaleString("sv-SE")
+        : "";
 
       div.innerHTML = `
-        <strong>${order.name}</strong><br>
-        ${order.amount} st ${order.pastry}<br>
-        ${order.comment}
-        <div class="order-time">📅 ${order.date} – ${order.time}</div>
+        <strong>${o.name}</strong><br>
+        ${o.amount} st ${o.pastry}<br>
+        ${o.comment || ""}
+        <div class="order-time">📅 ${date}</div>
 
         <button type="button" class="done-btn">✅ Klar</button>
-        <button type="button" class="delete-btn">Ta bort</button>
+        <button type="button" class="delete-btn">🗑️ Ta bort</button>
       `;
 
       container.appendChild(div);
     });
   }
 
-  document.getElementById("orders").addEventListener("click", function (e) {
+  document.getElementById("orders").addEventListener("click", async e => {
     if (!sellerLoggedIn) {
       alert("Endast säljare kan ändra beställningar");
       return;
@@ -215,22 +219,54 @@
     const orderDiv = e.target.closest(".order");
     if (!orderDiv) return;
 
-    const id = Number(orderDiv.dataset.id);
+    const id = orderDiv.dataset.id;
 
     if (e.target.classList.contains("delete-btn")) {
-      orders = orders.filter(o => o.id !== id);
-      saveOrders();
+      await deleteDoc(doc(db, "orders", id));
       renderOrders();
     }
 
     if (e.target.classList.contains("done-btn")) {
-      const order = orders.find(o => o.id === id);
-      order.done = !order.done;
-      saveOrders();
+      await updateDoc(doc(db, "orders", id), {
+        done: !orderDiv.classList.contains("done")
+      });
       renderOrders();
     }
   });
 
+</script>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
+  import {
+    getFirestore,
+    collection,
+    addDoc,
+    getDocs,
+    deleteDoc,
+    doc,
+    updateDoc
+  } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyAuU1FI8E9-ooRi5VLxWJrIGj4SBoKByo",
+    authDomain: "bakelse-bestallningar.firebaseapp.com",
+    projectId: "bakelse-bestallningar",
+    storageBucket: "bakelse-bestallningar.firebasestorage.app",
+    messagingSenderId: "194687991123",
+    appId: "1:194687991123:web:f8a022c7c2c679b40d35a6"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  window.db = db;
+  window.collection = collection;
+  window.addDoc = addDoc;
+  window.getDocs = getDocs;
+  window.deleteDoc = deleteDoc;
+  window.doc = doc;
+  window.updateDoc = updateDoc;
 </script>
 
 </body>
